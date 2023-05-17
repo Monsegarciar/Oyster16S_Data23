@@ -25,21 +25,49 @@ library("readr")
 library("metacoder")
 display.brewer.all()
 theme_set(theme_bw())
+library("forcats")
+library("remotes")
+library("microshades")
+#remotes::install_github("KarstensLab/microshades")
+#update.packages()
+
+
+microshades_palettes <- list(
+  micro_gray = c("#d9d9d9","#bdbdbd", "#969696","#737373","#525252"),
+  micro_brown = c("#D8C7BE", "#CAA995", "#B78560", "#9E5C00", "#7D3200"),
+  micro_green = c("#c7e9c0", "#a1d99b","#74c476", "#41ab5d", "#238b45"),
+  micro_orange = c("#feeda0","#fec44f","#fdae6b", "#fe9929","#ff7f00"),
+  micro_blue = c("#eff3ff","#c6dbef", "#9ecae1", "#6baed6", "#4292c6"),
+  micro_purple = c("#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3"))
+microshades_cvd_palettes <- list(
+  micro_cvd_gray = c("#F5F5F5", "#D6D6D6", "#B7B7B7", "#8B8B8B","#616161"),
+  micro_cvd_green = c("#DDFFA0",  "#BDEC6F",  "#97CE2F", "#6D9F06","#4E7705"),
+  micro_cvd_orange = c("#FFD5AF",  "#FCB076","#F09163", "#C17754", "#9D654C"),
+  micro_cvd_blue = c("#E7F4FF", "#BCE1FF", "#7DCCFF", "#56B4E9","#098BD9"),
+  micro_cvd_turquoise = c("#A3E4D7", "#48C9B0",  "#43BA8F",  "#009E73", "#148F77"),
+  micro_cvd_purple = c("#EFB6D6", "#E794C1", "#CC79A7", "#A1527F", "#7D3560"))
+
+
+colors <-c(microshades_palette("micro_gray", 5, lightest = FALSE), 
+           microshades_palette("micro_brown", 5, lightest = FALSE),
+           microshades_palette("micro_green", 5, lightest = FALSE), 
+           microshades_palette("micro_orange", 5, lightest = FALSE), 
+           microshades_palette("micro_blue", 5, lightest = FALSE), 
+           microshades_palette("micro_purple", 5, lightest = FALSE), 
+           microshades_palette("micro_cvd_gray", 5, lightest = FALSE), 
+           microshades_palette("micro_cvd_green", 5, lightest = FALSE),
+           microshades_palette("micro_cvd_orange", 5, lightest = FALSE), 
+           microshades_palette("micro_cvd_blue", 5, lightest = FALSE), 
+           microshades_palette("micro_cvd_turquoise", 5, lightest = FALSE), 
+           microshades_palette("micro_cvd_purple", 5, lightest = FALSE)) 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-  
-#Data Cleanup + Phyloseq object ####
-#Loading the data (Original Data is called DE_DATA_ForGenetics_17.csv)
-##de_data17 <- read.csv("Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/DE_DATA_ForGenetics_17.csv")
-de_data17 <- read.csv("Data/DE2018_alldata - Copy.csv")
+## Cleaning 2017 Data ####
+view()
+de_data17 <- read.csv("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/DE_DATA_ForGenetics_17.csv")
+meta17 <- read.csv("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/metadata_de17.csv")
+asv17 <- fread("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/asvtable_de17.csv")
 
-#Loading the data (Original Data is called metadata_de17.csv)
-##meta17 <- read.csv("Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/metadata_de17.csv")
-meta17 <- read.csv("Data/metadata_de17 - Copy.csv")
-
-#Loading the data (Original Data Name = asvtable_de17.csv)
-##asv17 <- fread("Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/asvtable_de17.csv")
-asv17 <- fread("Data/asvtable_de17 - Copy.csv")
 
 #Renaming the Treatment Names
 de_data17$Treatment
@@ -78,24 +106,195 @@ meta17data <- select(meta17data,
                      -"Dry_weight_final", 
                      -"Dry_weight_shell", 
                      -"Notes_post", 
-                     -"Genetics_Weight")
+                     -"Genetics_Weight", 
+                     -"LiveMM", 
+                     -"RFTM_date")
+
+meta17data$Length_pre <- replace(meta17data$Length_pre, meta17data$Length_pre == "MISSING", 0) 
+meta17data$Width_pre <- replace(meta17data$Width_pre, meta17data$Width_pre == "MISSING", 0) 
+meta17data$Height_pre <- replace(meta17data$Height_pre, meta17data$Height_pre == "MISSING", 0) 
+meta17data$Weight_pre <- replace(meta17data$Weight_pre, meta17data$Weight_pre == "MISSING", 0) 
+
+
+#Make peacrabs into a factor
+meta17data$peacrabs.f <- factor(meta17data$peacrabs.x)
+typeof(meta17data$peacrabs.f)#Remains "integer"
+is.factor(meta17data$peacrabs.f) #True
+
+#Make RFTM_score into a factor
+meta17data$RFTM_score.f <- factor(meta17data$RFTM_score.x)
+typeof(meta17data$RFTM_score.f) #Remains "integer"
+is.factor(meta17data$RFTM_score.f)
+
+typeof(meta17data$peacrabs.x) #Integer
+typeof(meta17data$RFTM_score.x) #Double
+
+#make a simpler rftm factor without 0.5 and combining 4 and 5
+#changing 0.5 to 1 and 5 to 4, we are left with 1,2,3,4
+meta17data$RFTM_simp <- meta17data$RFTM_score.f
+meta17data$RFTM_simp <- sub("0.5", "1", meta17data$RFTM_simp)
+meta17data$RFTM_simp <- sub("5", "4", meta17data$RFTM_simp)
+
+#Anything equal to O is absence, everything else=(1,2,3,4) is presence
+meta17data$RFTM_pa <- ifelse(meta17data$RFTM_score.x=="0", 0, 1)
+meta17data$RFTM_pa <- factor(meta17data$RFTM_pa)
+
 
 #Making Unique IDs the new row names for Phyloseq
 rownames(meta17data) = meta17data$UniqueID
 rownames(meta17data) #UniqueID
 meta17data$UniqueID=NULL
-write.csv(meta17data, file = "Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/cleanmetadata17")
+write.csv(meta17data, file = "/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/cleanmetadata17.csv")
+data_meta17_clean <- read.csv("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/cleanmetadata17.csv")
 
 
-## PHYLOSEQ ####
-c_meta17data <- read.csv("Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/cleanmetadata17")
-asvtable17 <- fread("Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/asvtable_de17.csv")
-run23 <- read.csv("Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/Run123_taxa_complete.csv")
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+## Cleaning 2018 Data ####
+
+de_data18 <- read.csv("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/DE2018_alldata.csv")
+meta18 <- read.csv("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/metadata_de18.csv")
+asv18 <- fread("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/asvtable_de18.csv")
+
+
+meta18$Species <- ifelse(meta18$Species =="CV", "CV",
+                         ifelse(meta18$Species == "IR", "IR", 
+                                ifelse(meta18$Species == "MM", "AM", "LP")))
+
+#Changing the abbreviations to the new name abbreviation (DE_DATA18)
+de_data18$Species <- ifelse(de_data18$Species =="CV", "CV",
+                            ifelse(de_data18$Species == "IR", "IR", 
+                                   ifelse(de_data18$Species == "MM", "AM", "LP")))
+
+#Creating a Treatment2 column with the combination ####
+#de_data18$Treatment <- paste(de_data18$Treatment1_Density, "_", de_data18$Treatment2_Diversity)
+
+de_data18$Treatment <- ifelse(de_data18$Bucket =="HP1", "HIGH_POLY1",
+                                  ifelse(de_data18$Bucket =="HP2", "HIGH_POLY2",
+                                         ifelse(de_data18$Bucket =="HP3", "HIGH_POLY3",
+                                                ifelse(de_data18$Bucket =="HP4", "HIGH_POLY4",
+                                                       ifelse(de_data18$Bucket =="HP5", "HIGH_POLY5",
+                                                              ifelse(de_data18$Bucket =="HP6", "HIGH_POLY6",
+                                                                     ifelse(de_data18$Bucket =="HP7", "HIGH_POLY7",
+                                                                            ifelse(de_data18$Bucket =="HP8", "HIGH_POLY8",
+                                                                                   ifelse(de_data18$Bucket =="HP9", "HIGH_POLY9",
+                                                                                          
+                                                                                          ifelse(de_data18$Bucket == "HM1", "HIGH_MONO1",
+                                                                                                 ifelse(de_data18$Bucket == "HM2", "HIGH_MONO2",
+                                                                                                        ifelse(de_data18$Bucket == "HM3", "HIGH_MONO3",
+                                                                                                               ifelse(de_data18$Bucket == "HM4", "HIGH_MONO4",
+                                                                                                                      ifelse(de_data18$Bucket == "HM5", "HIGH_MONO5",
+                                                                                                                             ifelse(de_data18$Bucket == "HM6", "HIGH_MONO6",
+                                                                                                                                    ifelse(de_data18$Bucket == "HM7", "HIGH_MONO7",
+                                                                                                                                           ifelse(de_data18$Bucket == "HM8", "HIGH_MONO8",
+                                                                                                                                                  ifelse(de_data18$Bucket == "HM9", "HIGH_MONO9",
+                                                                                                                                                         
+                                                                                                                                                         ifelse(de_data18$Bucket == "LP1", "LOW_POLY1",
+                                                                                                                                                                ifelse(de_data18$Bucket == "LP2", "LOW_POLY2",
+                                                                                                                                                                       ifelse(de_data18$Bucket == "LP3", "LOW_POLY3",
+                                                                                                                                                                              ifelse(de_data18$Bucket == "LP4", "LOW_POLY4",
+                                                                                                                                                                                     ifelse(de_data18$Bucket == "LP5", "LOW_POLY5",
+                                                                                                                                                                                            ifelse(de_data18$Bucket == "LP6", "LOW_POLY6",
+                                                                                                                                                                                                   ifelse(de_data18$Bucket == "LP7", "LOW_POLY7",
+                                                                                                                                                                                                          ifelse(de_data18$Bucket == "LP8", "LOW_POLY8",
+                                                                                                                                                                                                                 ifelse(de_data18$Bucket == "LP9", "LOW_POLY9",
+                                                                                                                                                                                                                        
+                                                                                                                                                                                                                        ifelse(de_data18$Bucket == "LM1", "LOW_POLY1",
+                                                                                                                                                                                                                               ifelse(de_data18$Bucket == "LM2", "LOW_POLY2",
+                                                                                                                                                                                                                                      ifelse(de_data18$Bucket == "LM3", "LOW_POLY3",
+                                                                                                                                                                                                                                             ifelse(de_data18$Bucket == "LM4", "LOW_POLY4",
+                                                                                                                                                                                                                                                    ifelse(de_data18$Bucket == "LM5", "LOW_POLY5",
+                                                                                                                                                                                                                                                           ifelse(de_data18$Bucket == "LM6", "LOW_POLY6",
+                                                                                                                                                                                                                                                                  ifelse(de_data18$Bucket == "LM7", "LOW_POLY7",
+                                                                                                                                                                                                                                                                         ifelse(de_data18$Bucket == "LM8", "LOW_POLY8","LOW_MONO9")))))))))))))))))))))))))))))))))))
+
+meta18$Treatment <- ifelse(meta18$Color_Bucket =="HP1", "HIGH_POLY1",
+                              ifelse(meta18$Color_Bucket =="HP2", "HIGH_POLY2",
+                                     ifelse(meta18$Color_Bucket =="HP3", "HIGH_POLY3",
+                                            ifelse(meta18$Color_Bucket =="HP4", "HIGH_POLY4",
+                                                   ifelse(meta18$Color_Bucket =="HP5", "HIGH_POLY5",
+                                                          ifelse(meta18$Color_Bucket =="HP6", "HIGH_POLY6",
+                                                                 ifelse(meta18$Color_Bucket =="HP7", "HIGH_POLY7",
+                                                                        ifelse(meta18$Color_Bucket =="HP8", "HIGH_POLY8",
+                                                                               ifelse(meta18$Color_Bucket =="HP9", "HIGH_POLY9",
+                                                                                      
+                                                                                      ifelse(meta18$Color_Bucket == "HM1", "HIGH_MONO1",
+                                                                                             ifelse(meta18$Color_Bucket == "HM2", "HIGH_MONO2",
+                                                                                                    ifelse(meta18$Color_Bucket == "HM3", "HIGH_MONO3",
+                                                                                                           ifelse(meta18$Color_Bucket == "HM4", "HIGH_MONO4",
+                                                                                                                  ifelse(meta18$Color_Bucket == "HM5", "HIGH_MONO5",
+                                                                                                                         ifelse(meta18$Color_Bucket == "HM6", "HIGH_MONO6",
+                                                                                                                                ifelse(meta18$Color_Bucket == "HM7", "HIGH_MONO7",
+                                                                                                                                       ifelse(meta18$Color_Bucket == "HM8", "HIGH_MONO8",
+                                                                                                                                              ifelse(meta18$Color_Bucket == "HM9", "HIGH_MONO9",
+                                                                                                                                                     
+                                                                                                                                                     ifelse(meta18$Color_Bucket == "LP1", "LOW_POLY1",
+                                                                                                                                                            ifelse(meta18$Color_Bucket == "LP2", "LOW_POLY2",
+                                                                                                                                                                   ifelse(meta18$Color_Bucket == "LP3", "LOW_POLY3",
+                                                                                                                                                                          ifelse(meta18$Color_Bucket == "LP4", "LOW_POLY4",
+                                                                                                                                                                                 ifelse(meta18$Color_Bucket == "LP5", "LOW_POLY5",
+                                                                                                                                                                                        ifelse(meta18$Color_Bucket == "LP6", "LOW_POLY6",
+                                                                                                                                                                                               ifelse(meta18$Color_Bucket == "LP7", "LOW_POLY7",
+                                                                                                                                                                                                      ifelse(meta18$Color_Bucket == "LP8", "LOW_POLY8",
+                                                                                                                                                                                                             ifelse(meta18$Color_Bucket == "LP9", "LOW_POLY9",
+                                                                                                                                                                                                                    
+                                                                                                                                                                                                                    ifelse(meta18$Color_Bucket == "LM1", "LOW_POLY1",
+                                                                                                                                                                                                                           ifelse(meta18$Color_Bucket == "LM2", "LOW_POLY2",
+                                                                                                                                                                                                                                  ifelse(meta18$Color_Bucket == "LM3", "LOW_POLY3",
+                                                                                                                                                                                                                                         ifelse(meta18$Color_Bucket == "LM4", "LOW_POLY4",
+                                                                                                                                                                                                                                                ifelse(meta18$Color_Bucket == "LM5", "LOW_POLY5",
+                                                                                                                                                                                                                                                       ifelse(meta18$Color_Bucket == "LM6", "LOW_POLY6",
+                                                                                                                                                                                                                                                              ifelse(meta18$Color_Bucket == "LM7", "LOW_POLY7",
+                                                                                                                                                                                                                                                                     ifelse(meta18$Color_Bucket == "LM8", "LOW_POLY8","LOW_MONO9")))))))))))))))))))))))))))))))))))
+
+#Creating the Column to merge the two data sets called merge18 & merge18
+de_data18$Merge18 <- paste("2018", de_data18$Treatment, de_data18$Color.Number, de_data18$Species, sep="_")#(DE_DATA18)
+meta18$Merge18 <- paste("2018", meta18$Treatment, meta18$Number, meta18$Species, sep="_") #(META18)
+#No Site 
+
+#Using Merge to combine the two data frames  ####
+#Done by matching the Merge18 columns
+meta18data <- merge(meta18, de_data18, by = "Merge18", all.x = TRUE) #Matching by column Merge18, all.x referrers to Meta18 because it was on the X place
+
+#Deleting columns in the new data frame
+data_meta18_clean <- select(meta18data, 
+                            -"X.x",
+                            -"V1", 
+                            -"Site",
+                            -"peacrabs", 
+                            -"Phase_1_DO", 
+                            -"Phase_1_temp",
+                            -"Phase_2_DO", 
+                            -"Phase_2_Temp",
+                            -"Overall_treatment", 
+                            -"dead_barnacles",
+                            -"Parasites", 
+                            -"X.y", 
+                            -"RFTM_score.y", 
+                            -"Merge18", 
+                            -"Treatment.x", 
+                            -"Species.x")
+
+View(data_meta18_clean)
+
+#Making Unique IDs the new row names for Phyloseq
+write.csv(data_meta18_clean, file = "/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/cleanmetadata18.csv")
+dm18_clean <- read.csv("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/cleanmetadata18.csv")
+dm18_clean$UniqueID <- make.names(dm18_clean$UniqueID, unique = TRUE)
+dm18_clean$UniqueID <-gsub("X","",as.character(dm18_clean$UniqueID))
+rownames(dm18_clean) <- dm18_clean$UniqueID 
+#dm18_clean$UniqueID=NULL
+write.csv(dm18_clean, file = "/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/meta18cleaned.csv")
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+## PHYLOSEQ 2017 ####
+c_md17 <- read.csv("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/cleanmetadata17.csv")
+asvtable17 <- fread("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/asvtable_de17.csv")
+run23 <- read.csv("/Users/dianaportugal/Documents/Smithsonian_2021/Oyster_16S/Oyster_data_raw/Run123_taxa_complete.csv")
 
 ## CHANGING ROW NAMES FOR EACH DATA SET
-rownames(c_meta17data) = c_meta17data$X
-c_meta17data$X=NULL
-rownames(c_meta17data)
+rownames(c_md17) = c_md17$X
+c_md17$X=NULL
+rownames(c_md17)
 #ROW NAMES ARE THE UNIQUE IDs 
 
 rownames(asvtable17) = asvtable17$V1
@@ -109,12 +308,12 @@ rownames(run23)
 #ROW NAMES ARE THE SEQUENCE 
 
 ## CONVERTING TO MATRICIES
-meta17_matrix <- as.data.frame(c_meta17data, rownames("X"))
+meta17_matrix <- as.data.frame(c_md17, rownames("X"))
 rownames(meta17_matrix)
 #STILL UNIQUE ID
 
-otumat_matrix <- as.matrix(asvtable17, rownames=rownames(asvtable17))
-rownames(otumat_matrix)
+otumat_matrix17 <- as.matrix(asvtable17, rownames=rownames(asvtable17))
+rownames(otumat_matrix17)
 #STILL UNIQUE ID 
 
 rownames(run23)
@@ -125,29 +324,29 @@ rownames(taxmat_matrix)
 
 
 ## SETTING OTU, TAX, SAMP
-OTU <- otu_table(otumat_matrix, taxa_are_rows = FALSE)
-rownames(OTU) #UniqueID
+OTU17 <- otu_table(otumat_matrix17, taxa_are_rows = FALSE)
+rownames(OTU17) #UniqueID
 
 TAX <- tax_table(taxmat_matrix)
 rownames(TAX) #Sequence
 
-SAMP <- sample_data(meta17_matrix)
-rownames(SAMP)#UniqueID
+SAMP17 <- sample_data(meta17_matrix)
+rownames(SAMP17)#UniqueID
 
 ## INSPECTING SAMPLE NAMES
-sample_names(SAMP) #UniqueID
-sample_names(OTU) #UniqueID
+sample_names(SAMP17) #UniqueID
+sample_names(OTU17) #UniqueID
 sample_names(TAX) #NULL
 
 
 ## EVENING OUT THE DATA
-OTU=transform_sample_counts(OTU, function(OTU) 1E6 * OTU/sum(OTU))
+OTU17 =transform_sample_counts(OTU17, function(OTU17) 1E6 * OTU17/sum(OTU17))
 
 ## READING THROUGH PHYLOSEQ
-physeq_class = phyloseq(OTU, TAX, SAMP) 
+physeq_class17 = phyloseq(OTU17, TAX, SAMP17) 
 
 #Final Object (Original)
-physeq_class
+physeq_class17
 
 #phyloseq-class experiment-level object
 #otu_table()   OTU Table:         [ 16383 taxa and 112 samples ]
@@ -156,7 +355,7 @@ physeq_class
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  #Identifying Intercept Variables ####  
+#Identifying Intercept Variables ####  
 
 #Make peacrabs into a factor
 SAMP$peacrabs.f <- factor(SAMP$peacrabs.x)
@@ -195,8 +394,8 @@ resultsNames(dds_rftmxpeasite)
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  ## RFTM_PA
-  resPA_rftm_3 <- results(dds_rftmxpeasite, name="RFTM_pa_1_vs_0")
+## RFTM_PA
+resPA_rftm_3 <- results(dds_rftmxpeasite, name="RFTM_pa_1_vs_0")
 sigPA_rftm_3 <- resPA_rftm_3[which(resPA_rftm_3$padj < 0.05), ]
 sigPA_rftm_3 <- cbind(as(sigPA_rftm_3, "data.frame"), as(tax_table(physeq)[rownames(sigPA_rftm_3), ], "matrix"))
 sigPA_rftm_3 <- select(sigPA_rftm_3, -baseMean, -lfcSE, -X, -stat, -pvalue, -padj, -Genus.y)
@@ -272,7 +471,7 @@ F3_PEAPA_wlog
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  #33.3 percent filtering ####  
+#33.3 percent filtering ####  
 
 ##RFTMpa Pruned
 #Remove OTUs that do not appear more than once in more than one third of the samples
@@ -286,6 +485,7 @@ F3_RFTMPA_wlog_prune
 
 F3_RFTMPA_wlog_prune_tax <- tax_table(F3_RFTMPA_wlog_prune)
 write.table(F3_RFTMPA_wlog_prune_tax, file="Documents/Smithsonian_2021/Oyster_16S/Log2Fold/3F_RFTMpa_pruned_log.csv", quote=FALSE,sep = ",", col.names=NA)
+#write.table(F3_RFTMPA_wlog_prune_tax, file="Desktop/3F_RFTMpa_pruned_log.csv", quote=FALSE,sep = ",", col.names=NA)
 
 
 ##PEApa Pruned
@@ -300,11 +500,11 @@ F3_PEAPA_wlog_prune
 
 F3_PEAPA_wlog_prune_tax <- tax_table(F3_PEAPA_wlog_prune)
 write.table(F3_PEAPA_wlog_prune_tax, file="Documents/Smithsonian_2021/Oyster_16S/Log2Fold/3F_PEApa_pruned_log.csv", quote=FALSE,sep = ",", col.names=NA)
+write.table(F3_PEAPA_wlog_prune_tax, file="Desktop/3F_PEApa_pruned_log.csv", quote=FALSE,sep = ",", col.names=NA)
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  #Filling in Taxonomy #### 
-
+#Filling in Taxonomy #### 
 ##RFTM
 RFTM_log <- read.csv("/Users/dianaportugal/Desktop/16S/Condensed Materials/Oyster-16S-22/Log2Fold/3F_RFTMpa_pruned_log.csv")
 #Transposing the data set 
@@ -314,6 +514,7 @@ RFTM_log <- tibble::rownames_to_column(RFTM_log, "Rank") #Make 1 column for row 
 RFTM_log[1, 1] <- " " #remove X title
 RFTM_log[2, 1] <- " " #remove Log2fold title
 View(RFTM_log)
+
 #For loop to get previous name 
 for (i in colnames(RFTM_log)[2:NCOL(RFTM_log)]){
   RFTM_log[[i]] <- (str_c(RFTM_log$Rank, "_", RFTM_log[[i]]))}
@@ -330,6 +531,7 @@ RFTM_log$L2F <- gsub("_","",as.character(RFTM_log$L2F)) #Removing the extra "_" 
 RFTM_log$L2F <- as.numeric(as.character(RFTM_log$L2F)) 
 RFTM_log$L2F <- signif(RFTM_log$L2F, 4) 
 View(RFTM_log)
+write.table(RFTM_log, file="Desktop/RFTM_log.csv", quote=FALSE,sep = ",", col.names=NA)
 
 
 ## PEACRABS
@@ -355,10 +557,12 @@ PEA_log$L2F <- gsub("_","",as.character(PEA_log$L2F)) #Removing the extra "_" in
 PEA_log$L2F <- as.numeric(as.character(PEA_log$L2F)) 
 PEA_log$L2F <- signif(PEA_log$L2F, 4) 
 View(PEA_log)
+write.table(PEA_log, file="Desktop/PEA_log.csv", quote=FALSE,sep = ",", col.names=NA)
+
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  # Log2Fold Taxa ####
+# Log2Fold Taxa ####
 
 RFTMCC <- length(unique(RFTM_log$Genus))
 RFTMgp <- colorRampPalette(brewer.pal(8, "Set1"))
@@ -383,7 +587,7 @@ ggplot(RFTM_log,aes(x = OTU, y=L2F, fill = Genus)) +
         panel.border = element_rect(color = "black",fill = NA,size = 1))+
   labs(x = "OTU",
        y = "Log2Fold Change")
-#ggsave(filename = "RFTM_Log2Fold_barplot.jpeg", plot=last_plot(), path="/Users/dianaportugal/Desktop", width = 11, height = 8)  
+ggsave(filename = "RFTM_Log2Fold_barplot.pdf", plot=last_plot(), path="/Users/dianaportugal/Desktop", width = 11, height = 8)  
 
 
 PEACC <- length(unique(PEA_log$Genus))
@@ -410,11 +614,11 @@ ggplot(PEA_log,aes(x = OTU, y=L2F, fill = Genus)) +
         panel.border = element_rect(color = "black",fill = NA,size = 1))+
   labs(x = "OTU",
        y = "Log2Fold Change")
-#ggsave(filename = "RFTM_Log2Fold_barplot.jpeg", plot=last_plot(), path="/Users/dianaportugal/Desktop", width = 11, height = 8)  
+ggsave(filename = "PEA_Log2Fold_barplot.pdf", plot=last_plot(), path="/Users/dianaportugal/Desktop", width = 11, height = 8)  
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  Comp_RFTM_log <- read.csv("Documents/Smithsonian_2021/Oyster_16S/Log2Fold/3F_RFTMpa_compLog.csv")
+Comp_RFTM_log <- read.csv("Documents/Smithsonian_2021/Oyster_16S/Log2Fold/3F_RFTMpa_compLog.csv")
 Comp_PEA_log <- read.csv("Documents/Smithsonian_2021/Oyster_16S/Log2Fold/3F_PEApa_compLog.csv")
 
 onethird_PEA_log <- read.csv("Documents/Smithsonian_2021/Oyster_16S/Log2Fold/3F_PEApa_pruned_log.csv")
@@ -461,7 +665,7 @@ taxmapRFTMPA %>%
   labs(title = "OTU Taxonomy Abundance for Oysters with RFTM", 
        subtitle = "Presence Absence",
        caption = "Data source: Oyster 16s 2017")
-#ggsave(filename = "RFTM_Comp_taxa.jpeg", plot=last_plot(), path="/Users/dianaportugal/Desktop", width = 11, height = 8)  
+ggsave(filename = "RFTM_Comp_taxa.pdf", plot=last_plot(), path="/Users/dianaportugal/Desktop", width = 11, height = 8)  
 
 
 ## Peacrabs
@@ -500,4 +704,6 @@ taxmapPEAPA %>%
   labs(title = "OTU Taxonomy Abundance for Oysters with Peacrabs", 
        subtitle = "Presence Absence",
        caption = "Data source: Oyster 16s 2017")
-#ggsave(filename = "Peacrabs_Comp_taxa.jpeg", plot=last_plot(), path="/Users/dianaportugal/Desktop", width = 11, height = 8)  
+ggsave(filename = "Peacrabs_Comp_taxa.pdf", plot=last_plot(), path="/Users/dianaportugal/Desktop", width = 11, height = 8)  
+
+------------------------------------------------------------------------------------------
